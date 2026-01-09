@@ -1,0 +1,21 @@
+{
+  "name": "@guetatanouar/prisma-esupadom.fr",
+  "version": "1.0.10",
+  "description": "Schéma Prisma partagé",
+  "files": [
+    "prisma/schema.prisma",
+    "prisma/migrations/**"
+  ],
+  "scripts": {
+    "postinstall": "echo 'Package installé. Utilisez le script de copie si nécessaire.'"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "devDependencies": {
+    "prisma": "^6.7.0"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.7.0"
+  }
+}

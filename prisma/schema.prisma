@@ -1,0 +1,356 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                     Int            @id @default(autoincrement())
+  firstName              String
+  lastName               String
+  gender                 String
+  dob                    DateTime?
+  dueDate                DateTime?
+  phone                  String?
+  school                 String?
+  address                String?
+  postalCode             String?
+  city                   String?
+  email                  String         @unique
+  hashedPassword         String?
+  role                   Role           @default(STUDENT)
+  is_instructor          Boolean        @default(false)
+  created_at             DateTime       @default(now())
+  updated_at             DateTime       @updatedAt
+  resetToken             String?
+  resetTokenExpiry       DateTime?
+  activationToken        String?        @unique
+  profilePicture         String?
+  classeId               Int?
+  niveauId               Int?
+  status                 StatusUser     @default(Inactive)
+  balance                String?
+  priceHour              String? 
+  reference              String?
+  accounts               Account[]
+  userConversationsUser1 Conversation[] @relation("ConversationUser1")
+  userConversationsUser2 Conversation[] @relation("ConversationUser2")
+  courses                Course[]
+  enrolments             Enrolment[]
+  favourites             Favourite[]
+  receivedMessages       Message[]      @relation("Receiver")
+  sentMessages           Message[]      @relation("Sender")
+  profile                Profile?
+  reviews                Review[]
+  taughtSeances          Seance[]       @relation("SeanceInstructor")
+  niveau                 Niveau?        @relation(fields: [niveauId], references: [id])
+  userClasses            UserClasse[]
+  matieres               UserMatiere[]
+  classe                 Classe[]       @relation("ClasseToUser")
+  seances                Seance[]       @relation("SeanceStudents")
+}
+
+model Configs {
+  id               Int    @id @default(autoincrement())
+  devise           String @default("€")
+  codeCountry      String @default("FR")
+  priceHour        String @default("16")
+  shortWebsiteName String @default("e-Supadom")
+}
+
+model Niveau {
+  id      Int      @id @default(autoincrement())
+  nom     String   @unique
+  classes Classe[]
+  users   User[]
+}
+
+model Classe {
+  id          Int          @id @default(autoincrement())
+  nom         String       @unique
+  niveauId    Int
+  niveau      Niveau       @relation(fields: [niveauId], references: [id], onDelete: Cascade)
+  devis       Devis[]
+  matieres    Matiere[]
+  userClasses UserClasse[]
+  users       User[]       @relation("ClasseToUser")
+}
+
+model UserClasse {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  classeId Int
+  classe   Classe @relation(fields: [classeId], references: [id])
+  user     User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, classeId])
+}
+
+model Matiere {
+  id       Int           @id @default(autoincrement())
+  nom      String
+  classeId Int
+  classe   Classe        @relation(fields: [classeId], references: [id], onDelete: Cascade)
+  users    UserMatiere[]
+  devis    Devis[]       @relation("DevisMatieres")
+}
+
+model UserMatiere {
+  id        Int     @id @default(autoincrement())
+  userId    Int
+  matiereId Int
+  matiere   Matiere @relation(fields: [matiereId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, matiereId])
+}
+
+model Seance {
+  id           Int      @id @default(autoincrement())
+  date         DateTime
+  horaire      String
+  duration     String
+  matiere      String
+  typeForfait  String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  google_meet_link String
+  instructorId Int
+  instructor   User     @relation("SeanceInstructor", fields: [instructorId], references: [id], onDelete: Cascade)
+  students     User[]   @relation("SeanceStudents")
+
+  @@index([instructorId])
+  @@index([date])
+}
+
+model Devis {
+  id          Int       @id @default(autoincrement())
+  name        String
+  postalCode  String
+  email       String
+  phone       String
+  countryCode String
+  classId     Int
+  message     String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  classe      Classe    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  matieres    Matiere[] @relation("DevisMatieres")
+  comment     String? 
+
+  @@index([classId])
+}
+
+model Profile {
+  id       Int     @id @default(autoincrement())
+  userId   Int     @unique
+  bio      String?
+  gender   String?
+  address  String?
+  phone    String?
+  website  String?
+  twitter  String?
+  facebook String?
+  linkedin String?
+  youtube  String?
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Account {
+  id                Int     @id @default(autoincrement())
+  userId            Int
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Course {
+  id                     Int         @id @default(autoincrement())
+  userId                 Int
+  category               String
+  title                  String
+  slug                   String
+  description            String
+  regular_price          Float
+  before_price           Float
+  lessons                String
+  duration               String
+  image                  String
+  access_time            String
+  requirements           String
+  what_you_will_learn    String
+  who_is_this_course_for String
+  in_home_page           Boolean     @default(false)
+  in_home_page_set_at    DateTime    @default(now())
+  created_at             DateTime    @default(now())
+  updated_at             DateTime    @updatedAt
+  status                 StatusUser  @default(Inactive)
+  assets                 Asset[]
+  user                   User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enrolments             Enrolment[]
+  favourites             Favourite[]
+  reviews                Review[]
+
+  @@index([userId])
+}
+
+model Review {
+  id         Int      @id @default(autoincrement())
+  rating     Int
+  comment    String?
+  userId     Int
+  courseId   Int
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, courseId])
+}
+
+model Asset {
+  id           Int      @id @default(autoincrement())
+  courseId     Int
+  type         Type     @default(video)
+  title        String?
+  file_url     String?
+  video_url    String?
+  video_length String?
+  is_preview   Boolean  @default(false)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+}
+
+model Enrolment {
+  id             Int           @id @default(autoincrement())
+  userId         Int
+  courseId       Int
+  order_number   String        @unique
+  price          Int?
+  paymentId      String?
+  payment_status PaymentStatus @default(PENDING)
+  status         PaymentStatus @default(PENDING)
+  payment_via    String?
+  created_at     DateTime      @default(now())
+  updated_at     DateTime      @updatedAt
+  course         Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, courseId])
+}
+
+model Favourite {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  courseId   Int
+  created_at DateTime @default(now())
+  course     Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, courseId])
+}
+
+model Message {
+  id             Int          @id @default(autoincrement())
+  text           String?
+  createdAt      DateTime     @default(now())
+  senderId       Int
+  receiverId     Int
+  conversationId Int
+  isRead         Boolean      @default(false)
+  attachments    Attachment[]
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  receiver       User         @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender         User         @relation("Sender", fields: [senderId], references: [id], onDelete: Cascade)
+}
+
+model Attachment {
+  id        Int      @id @default(autoincrement())
+  messageId Int
+  fileUrl   String
+  fileType  String
+  fileName  String?
+  fileSize  Int?
+  createdAt DateTime @default(now())
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+model Conversation {
+  id        Int       @id @default(autoincrement())
+  userId1   Int
+  userId2   Int
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user1     User      @relation("ConversationUser1", fields: [userId1], references: [id], onDelete: Cascade)
+  user2     User      @relation("ConversationUser2", fields: [userId2], references: [id], onDelete: Cascade)
+  messages  Message[]
+}
+
+model EsupadomPaiementUsers {
+  id        Int      @id @default(autoincrement())
+  gender    String
+  lastName  String
+  firstName String
+  email     String
+  subject   String
+  amount    Float
+  token     String?  @unique
+  status    Status   @default(Pending)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model RappelezMoi {
+  id          Int      @id @default(autoincrement())
+  name        String
+  phone       String 
+  message     String? 
+  createdAt   DateTime @default(now()) 
+}
+
+enum Role {
+  USER
+  INSTRUCTOR
+  ADMIN
+  STUDENT
+}
+
+enum Type {
+  file
+  video
+}
+
+enum StatusUser {
+  Inactive
+  Pending
+  Active
+}
+
+enum Status {
+  Pending
+  Approved
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CANCELLED
+  HOLD
+}
