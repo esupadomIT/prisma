@@ -1,6 +1,6 @@
 {
-  "name": "@guetatanouar/prisma-esupadom.fr",
-  "version": "1.0.10",
+  "name": "shared-prisma-ee-es",
+  "version": "2.0.0",
   "description": "Schéma Prisma partagé",
   "files": [
     "prisma/schema.prisma",

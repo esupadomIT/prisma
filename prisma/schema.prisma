@@ -1,3 +1,37 @@
+// ============================================================================
+// SCHÉMA PRISMA PARTAGÉ — @guetatanouar/prisma-esupadom.fr
+// ----------------------------------------------------------------------------
+// Package consommé par e-supadom.fr, elite-etude.tn et le dépôt cronjob —
+// source de vérité unique pour éviter que les trois divergent silencieusement.
+//
+// Construit par fusion additive des schémas e-supadom.fr et elite-etude.tn
+// (voir historique dans le dépôt cronjob : docs/SCHEMA-UNIFICATION.md pour le
+// détail des différences trouvées et la marche à suivre par site).
+//
+// Principe appliqué partout : ADDITIF UNIQUEMENT.
+//   - Aucun champ ni modèle utilisé par un site n'est supprimé ou renommé
+//     silencieusement.
+//   - Tout champ propre à un seul site reste optionnel (ou avec @default),
+//     donc son ajout à l'autre base est une simple colonne inutilisée,
+//     jamais une contrainte NOT NULL qui casserait les INSERT existants.
+//   - Le SEUL changement qui n'est pas 100% "additif" est le renommage
+//     Disponibilite.instructorId → userId, déjà en place côté e-supadom.fr.
+//     Migration + patch de code encore à faire côté elite-etude.tn — voir
+//     SCHEMA-UNIFICATION.md §1 (dépôt cronjob).
+//
+// Repères dans les commentaires :
+//   [COMMUN]          → utilisé par les deux sites, aucune divergence
+//   [ESUPADOM]        → n'existe aujourd'hui que côté e-supadom.fr
+//   [ELITE]           → n'existe aujourd'hui que côté elite-etude.tn
+//   [DIVERGENCE #n]   → renvoie à la section correspondante de
+//                       SCHEMA-UNIFICATION.md (dépôt cronjob)
+//
+// ⚠️ Après toute modification ici : bumper la version dans package.json,
+// publier (`npm publish`), puis dans chaque projet consommateur réinstaller
+// la dépendance et lancer `prisma migrate dev` / `db push` pour appliquer
+// réellement les changements en base avant de compter dessus en prod.
+// ============================================================================
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,15 +45,16 @@ model User {
   id                     Int            @id @default(autoincrement())
   firstName              String
   lastName               String
-  gender                 String
+  gender                 String?
   dob                    DateTime?
-  dueDate                DateTime?
   phone                  String?
-  school                 String?
-  address                String?
+  phoneParent            String?
   postalCode             String?
   city                   String?
+  etablissement          String?        // [ELITE] établissement scolaire — inutilisé côté e-supadom.fr, laissé null
   email                  String         @unique
+  commentaire            String?        @default("")
+  emailParent            String?
   hashedPassword         String?
   role                   Role           @default(STUDENT)
   is_instructor          Boolean        @default(false)
@@ -32,9 +67,21 @@ model User {
   classeId               Int?
   niveauId               Int?
   status                 StatusUser     @default(Inactive)
+  inscriptionFees        Status         @default(Pending)
+  // [COMMUN] Anti-double-passage du cron rentrée scolaire (cronjob) : mémorise
+  // l'année du dernier passage de niveau automatique pour cet élève, pour ne
+  // pas faire sauter 2 niveaux si le cron est relancé la même année.
+  // ⚠️ Migration base pas encore générée/appliquée sur e-supadom.fr ni
+  // elite-etude.tn au moment de l'ajout de ce champ — à faire avant tout
+  // déploiement du cron cron-rentree-scolaire-niveau-eleves.ts.
+  lastLevelUpYear        Int?
   balance                String?
-  priceHour              String? 
+  forfait                String?        @default("")
+  typeCour               String?        @default("")
+  priceHour              String?
   reference              String?
+  emailVerified          DateTime?
+  autoReceiveMissions    Boolean        @default(true) // [ESUPADOM] réception auto des missions "Trouver un prof"
   accounts               Account[]
   userConversationsUser1 Conversation[] @relation("ConversationUser1")
   userConversationsUser2 Conversation[] @relation("ConversationUser2")
@@ -51,14 +98,84 @@ model User {
   matieres               UserMatiere[]
   classe                 Classe[]       @relation("ClasseToUser")
   seances                Seance[]       @relation("SeanceStudents")
+  totalHours             Float?         @default(0)
+  lowBalanceRelanceSent  Int?           @default(0) // 0 = jamais, 1 = ≤1h30, 2 = =0, 3 = J+2, 4 = J+7
+  zeroBalanceDate        DateTime?      // Date à laquelle totalHours est passé à 0
+  echeanceDate           String?        @default("")
+  experienceProf         StatusExperience @default(Debutant)
+
+  googleId               String?   @unique
+  facebookId              String?   @unique
+  disponibilites          Disponibilite[]
+  instructorAvailabilityCronFlags InstructorAvailabilityCronFlag?
+
+  // [ESUPADOM] Zones scolaires France (A/B/C/SPECIFIQUE) — sans objet pour
+  // elite-etude.tn (Tunisie, pas de zonage académique), laissés null.
+  schoolZoneDetected      String?
+  schoolZoneForced        String?
+  schoolZoneFinal         String?
+
+  // [ESUPADOM] Marketplace "Trouver un prof" — DIVERGENCE #3, voir doc.
+  trouverProfRequests           TrouverProfRequest[]           @relation("TrouverProfRequestStudent")
+  trouverProfAcceptedRequests   TrouverProfRequest[]           @relation("TrouverProfRequestAccepted")
+  trouverProfInstructorRequests TrouverProfRequestInstructor[]
+}
+
+model Disponibilite {
+  id          Int      @id @default(autoincrement())
+  // [DIVERGENCE #1] Champ nommé `instructorId`/`instructor` côté elite-etude.tn
+  // aujourd'hui. Nom canonique retenu ici : `userId`/`user` (déjà en prod
+  // côté e-supadom.fr). Migration + patch de code requis côté elite-etude.tn
+  // avant de pointer ce schéma sur sa base — voir SCHEMA-UNIFICATION.md §1.
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startDate   DateTime
+  endDate     DateTime
+  isAvailable Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([userId])
 }
 
 model Configs {
   id               Int    @id @default(autoincrement())
+  // Valeurs par défaut ci-dessous = filet de sécurité si une ligne Configs
+  // est créée sans valeurs explicites. Sans impact sur la ligne déjà seedée
+  // en prod sur chacun des deux sites (elite-etude.tn a déjà sa ligne avec
+  // devise="â‚¬"/"elite-etude" en base, ce schéma ne la modifie pas).
   devise           String @default("€")
   codeCountry      String @default("FR")
   priceHour        String @default("16")
   shortWebsiteName String @default("e-Supadom")
+}
+
+model SchoolHoliday {
+  // [DIVERGENCE #2] Les deux sites avaient un modèle `SchoolHoliday` avec
+  // des colonnes différentes (elite-etude.tn : simple label/type ; e-supadom.fr :
+  // zonage academique schoolYear/schoolZone/holidayType). Fusion additive :
+  // toutes les colonnes non communes sont optionnelles, donc chaque site
+  // continue à n'écrire/lire que les colonnes qu'il connaît déjà.
+  id          Int      @id @default(autoincrement())
+  schoolYear  String?  // [ESUPADOM]
+  schoolZone  String?  // [ESUPADOM] A, B, C, SPECIFIQUE
+  holidayType String?  // [ESUPADOM]
+  type        String?  @default("SCHOOL_VACATION") // [ELITE] conservé tel quel pour compat avec le code existant
+  label       String
+  startDate   DateTime
+  endDate     DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // NB Postgres : une contrainte UNIQUE laisse passer plusieurs NULL sur les
+  // colonnes concernées, donc cette contrainte ne s'applique de fait qu'aux
+  // lignes e-supadom.fr (qui remplissent toujours ces 3 champs) et n'entrave
+  // pas les lignes elite-etude.tn (qui les laissent null).
+  @@unique([schoolYear, schoolZone, holidayType, startDate])
+  @@index([schoolYear])
+  @@index([schoolZone])
+  @@index([holidayType])
+  @@index([startDate, endDate])
 }
 
 model Niveau {
@@ -66,6 +183,7 @@ model Niveau {
   nom     String   @unique
   classes Classe[]
   users   User[]
+  devis   Devis[]
 }
 
 model Classe {
@@ -77,6 +195,7 @@ model Classe {
   matieres    Matiere[]
   userClasses UserClasse[]
   users       User[]       @relation("ClasseToUser")
+  stages      Stage[]
 }
 
 model UserClasse {
@@ -109,39 +228,283 @@ model UserMatiere {
 }
 
 model Seance {
-  id           Int      @id @default(autoincrement())
-  date         DateTime
-  horaire      String
-  duration     String
-  matiere      String
-  typeForfait  String
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  google_meet_link String
-  instructorId Int
-  instructor   User     @relation("SeanceInstructor", fields: [instructorId], references: [id], onDelete: Cascade)
-  students     User[]   @relation("SeanceStudents")
+  id                Int      @id @default(autoincrement())
+  // [DIVERGENCE #4] @db.Timestamptz(3) : côté e-supadom.fr uniquement pour
+  // l'instant (correction d'un bug de fuseau horaire). Conservé ici tel
+  // quel pour ne rien changer au comportement actuel de e-supadom.fr.
+  // NE PAS appliquer `prisma migrate`/`db push` de ce schéma sur la base
+  // elite-etude.tn tant que la conversion timestamp→timestamptz de ses
+  // données existantes n'a pas été validée — voir SCHEMA-UNIFICATION.md §4.
+  date              DateTime @db.Timestamptz(3)
+  horaire           String
+  duration          String
+  matiere           String
+  typeForfait       String
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime @updatedAt @db.Timestamptz(3)
+  google_meet_link  String   @default("#")
+  google_meet_record String  @default("#")
+  minoration_prix_per_hour Float? @default(0)
+  instructorId      Int
+  instructor        User     @relation("SeanceInstructor", fields: [instructorId], references: [id], onDelete: Cascade)
+  students          User[]   @relation("SeanceStudents")
+
+  // Champs pour la suppression logique et traçabilité [COMMUN]
+  status            SeanceStatus @default(ACTIVE) // ACTIVE, CANCELLED, COMPLETED, NO_SHOW
+  is_deleted        Boolean      @default(false)
+  deleted_by        String?      @db.VarChar(50) // 'Enseignant', 'Etudiant', 'Administrateur', 'Système'
+  deletion_reason   String?      @db.Text
+  deleted_at        DateTime?    @db.Timestamptz(3)
+  original_price    Float?
+  cancelled_by_id   Int?
+
+  cancellation_count    Int      @default(0)
+  cancellation_date     DateTime? @db.Timestamptz(3)
+  cancellation_reason_category String? @db.VarChar(50)
+
+  postFirstCourseRelanceProf    Int? @default(0)
+  postFirstCourseRelanceStudent Int? @default(0)
+
+  presenceLog       String?  @db.Text
+
+  instructorRelance Int?     @default(0)
+  studentRelance    Int?     @default(0)
 
   @@index([instructorId])
   @@index([date])
+  @@index([status])
+  @@index([is_deleted])
+  @@index([deleted_at])
+}
+
+enum SeanceStatus {
+  ACTIVE      // Séance active et confirmée
+  CANCELLED   // Séance annulée (soft delete)
+  COMPLETED   // Séance terminée
+  NO_SHOW     // Séance où l'étudiant ou le professeur ne s'est pas présenté
 }
 
 model Devis {
-  id          Int       @id @default(autoincrement())
-  name        String
-  postalCode  String
-  email       String
-  phone       String
-  countryCode String
-  classId     Int
-  message     String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  classe      Classe    @relation(fields: [classId], references: [id], onDelete: Cascade)
-  matieres    Matiere[] @relation("DevisMatieres")
-  comment     String? 
+  id            Int          @id @default(autoincrement())
+  name          String
+  postalCode    String
+  email         String
+  phone         String
+  countryCode   String
+  classId       Int
+  niveauId      Int?
+  message       String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  classe        Classe       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  niveau        Niveau?      @relation(fields: [niveauId], references: [id])
+  matieres      Matiere[]    @relation("DevisMatieres")
+  comment       String?
+  status        DevisStatus  @default(EN_COURS)
+  causeArchive  causeArchive? @relation(fields: [causeArchiveId], references: [id])
+  causeArchiveId Int?
+  commercial  commercial? @relation(fields: [commercialId], references: [id])
+  commercialId Int?
+  archived      Boolean      @default(false)
+  inscrit       Boolean      @default(false)
+  relance       Int          @default(0)
+  enableRelance Boolean      @default(true)
+  presentationDate String?   @default("-")
+  echangeDate   String?      @default("-")
 
   @@index([classId])
+  @@index([niveauId])
+}
+
+model commercial {
+  id    Int     @id @default(autoincrement())
+  title String? @db.VarChar(255) @default("Nouveau cause")
+  devis Devis[]
+}
+
+model causeArchive {
+  id    Int     @id @default(autoincrement())
+  title String? @db.VarChar(255) @default("Nouveau cause")
+  devis Devis[]
+}
+
+model Stage {
+  id            Int       @id @default(autoincrement())
+  classeId      Int
+  classe        Classe    @relation(fields: [classeId], references: [id], onDelete: Cascade)
+  nbrHours      String
+  price1matiere String
+  price2matiere String
+  price3matiere String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([classeId])
+}
+
+model Blog {
+  id            Int      @id @default(autoincrement())
+  path          String   @db.Text
+  title         String?  @db.VarChar(255) @default("Nouveau SMS")
+  content       String?  @db.Text @default("")
+  createdAt     DateTime @default(now())
+  image         String?  @db.Text @default("")
+  description   String?  @db.Text @default("")
+  alt           String?  @db.Text @default("")
+  fulldate      DateTime @default(now())
+  status        Status   @default(Pending)
+}
+
+model Page {
+  // [ESUPADOM] Pages de contenu éditables (SEO). Table inutilisée par
+  // elite-etude.tn tant que sa propre interface d'admin ne l'exploite pas.
+  id            Int      @id @default(autoincrement())
+  path          String   @unique @db.Text
+  title         String?  @db.VarChar(255)
+  content       String?  @db.Text @default("")
+  description   String?  @db.Text @default("")
+  image         String?  @db.Text @default("")
+  alt           String?  @db.Text @default("")
+  testimonials  Json?
+  faq           Json?
+  createdAt     DateTime @default(now())
+  status        Status   @default(Pending)
+}
+
+model AppRole {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  hiddenItems  String[]
+}
+
+model sms {
+  id           Int      @id @default(autoincrement())
+  title        String?  @db.VarChar(255) @default("Nouveau SMS")
+  content      String?  @db.Text @default("")
+  createdAt    DateTime @default(now())
+}
+
+model mailing {
+  id           Int      @id @default(autoincrement())
+  title        String?  @db.VarChar(255) @default("Nouveau SMS")
+  content      String?  @db.Text @default("")
+  createdAt    DateTime @default(now())
+}
+
+model Forfait {
+  id        Int      @id @default(autoincrement())
+  value     String   @unique
+  nom       String
+  heureMin  Int
+  heureMax  Int?
+  echeance  String
+  niveau  String @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model TypeCours {
+  id        Int         @id @default(autoincrement())
+  value     String      @unique
+  label     String
+  hideFor   String[]
+  price     Json
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+model SalaireProfesseur {
+  id                  Int      @id @default(autoincrement())
+  niveau              String   @unique
+  coursParticulier    Float    @map("cours_particulier")
+  coursGroupe         Float    @map("cours_groupe")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("salaires_professeurs")
+}
+
+model Parametre {
+  id        Int      @id @default(autoincrement())
+  value     String   @unique
+  label     String
+  hideFor   String[]
+  price     Float
+  echeance  Float   @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model ReminderLog {
+  id           Int      @id @default(autoincrement())
+  sessionId    Int
+  reminderType String   // '30min' ou '15min'
+  sentAt       DateTime @default(now())
+
+  @@map("reminder_logs")
+}
+
+model InstructorAvailabilityCronFlag {
+  id                      Int      @id @default(autoincrement())
+  instructorId            Int      @unique
+  instructor              User     @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  isEligible              Boolean  @default(false)
+  hasAvailabilityInWindow Boolean  @default(false)
+  showPopup               Boolean  @default(false)
+  reminderEnabled         Boolean  @default(true)
+  windowStart             DateTime?
+  windowEndExclusive      DateTime?
+  activityStart           DateTime?
+  lastEvaluatedAt         DateTime @default(now())
+  lastReminderSentAt      DateTime?
+  reminderSentCount       Int      @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([showPopup])
+  @@map("instructor_availability_cron_flags")
+}
+
+model Candidature {
+  id                  Int       @id @default(autoincrement())
+  civility            String
+  name                String
+  surname             String
+  birthdate           DateTime
+  address             String
+  postalCode          String
+  city                String
+  phone               String
+  countryCode         String
+  email               String
+  diploma             String
+  school              String
+  educationLevel      String
+  professionalSituation String
+  lieux               String
+  motorise            String
+  niveauEtude         String
+  disponibilites      String[]
+  matieres            String[]
+  logiciels           String[]
+  message             String
+  createdAt           DateTime  @default(now())
+  status              CandidatureStatus @default(PENDING)
+  notes               String?
+  updatedAt           DateTime  @updatedAt
+  cvFiles             CvFile[]
+}
+
+model CvFile {
+  id             Int         @id @default(autoincrement())
+  filename       String
+  path           String
+  url            String      @unique
+  mimetype       String
+  size           Int
+  candidature    Candidature @relation(fields: [candidatureId], references: [id])
+  candidatureId  Int
+  createdAt      DateTime    @default(now())
 }
 
 model Profile {
@@ -274,7 +637,10 @@ model Message {
   senderId       Int
   receiverId     Int
   conversationId Int
-  isRead         Boolean      @default(false)
+  isRead         Boolean  @default(false)
+
+  lastNotifiedLevel Int?     // null = jamais notifié, 1 à 5 = dernier niveau envoyé
+
   attachments    Attachment[]
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   receiver       User         @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
@@ -309,10 +675,16 @@ model EsupadomPaiementUsers {
   lastName  String
   firstName String
   email     String
+  studentMail     String @default("")
+  priceHour     Float @default(0)
+  forfait     String @default("")
+  echeance     String @default("")
   subject   String
   amount    Float
   token     String?  @unique
   status    Status   @default(Pending)
+  recapTransaction String? @default("")
+  fraisDossier String? @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
@@ -320,16 +692,24 @@ model EsupadomPaiementUsers {
 model RappelezMoi {
   id          Int      @id @default(autoincrement())
   name        String
-  phone       String 
-  message     String? 
-  createdAt   DateTime @default(now()) 
+  phone       String
+  message     String?
+  createdAt   DateTime @default(now())
+}
+
+enum DevisStatus {
+  EN_COURS
+  A_SUIVRE
+  ARCHIVE
 }
 
 enum Role {
   USER
+  COMMERCIAL
   INSTRUCTOR
   ADMIN
   STUDENT
+  CM
 }
 
 enum Type {
@@ -353,4 +733,103 @@ enum PaymentStatus {
   PAID
   CANCELLED
   HOLD
+}
+
+enum CandidatureStatus {
+  PENDING
+  REVIEWED
+  APPROVED
+  REJECTED
+}
+
+enum StatusExperience {
+  Debutant
+  Confirme
+  Expert
+}
+
+// ----------------------------------------------------------------------------
+// [ESUPADOM] Modèles ci-dessous propres à e-supadom.fr — zonage académique
+// France et marketplace "Trouver un prof". Additifs : de nouvelles tables,
+// ne touchent aucune colonne existante. elite-etude.tn peut les ignorer
+// purement et simplement (tables présentes en base mais jamais utilisées),
+// ou les adopter plus tard si le besoin se présente.
+// ----------------------------------------------------------------------------
+
+model DepartmentZoneMapping {
+  departmentCode String  @id
+  departmentName String
+  academy        String
+  schoolZone     String  // A, B, C, SPECIFIQUE
+  isSpecificCase Boolean @default(false)
+  comment        String?
+
+  @@map("department_zone_mappings")
+}
+
+model TrouverProfRequest {
+  id                      Int            @id @default(autoincrement())
+  studentId               Int
+  student                 User           @relation("TrouverProfRequestStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  matiere                 String
+  niveau                  String
+  typeForfait             String         @default("soutien_scolaire")
+  objectives              String[]
+  description             String?
+  chapter                 String
+  deadline                String?
+  files                   String?        @db.Text
+  studentAvailabilitySlots String?       @db.Text
+  childFeelings           String[]
+  genderPreference        String         @default("indifferent")
+  hasTeacherId            String         @default("no")
+  teacherId               String?
+  confirmedAvailability   String         @default("")
+  budgetConfirmed         String         @default("")
+  studentName             String
+  status                  TrouverProfRequestStatus @default(PENDING)
+  acceptedByInstructorId  Int?
+  acceptedBy              User?          @relation("TrouverProfRequestAccepted", fields: [acceptedByInstructorId], references: [id])
+  acceptedAt              DateTime?
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+  expiresAt               DateTime?
+  notifiedAt              DateTime?
+
+  instructors             TrouverProfRequestInstructor[]
+
+  @@index([studentId])
+  @@index([status])
+  @@index([acceptedByInstructorId])
+  @@map("trouver_prof_requests")
+}
+
+model TrouverProfRequestInstructor {
+  id             Int                        @id @default(autoincrement())
+  requestId      Int
+  instructorId   Int
+  request        TrouverProfRequest         @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  instructor     User                       @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  status         TrouverProfInstructorStatus @default(PENDING)
+  viewedAt       DateTime?
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@unique([requestId, instructorId])
+  @@index([instructorId])
+  @@index([status])
+  @@map("trouver_prof_request_instructors")
+}
+
+enum TrouverProfRequestStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum TrouverProfInstructorStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
 }
