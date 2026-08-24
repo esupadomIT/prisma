@@ -35,6 +35,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# npm auth tokens (GitHub Packages, etc.) — ne jamais committer
+.npmrc
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

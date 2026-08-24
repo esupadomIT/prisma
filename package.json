@@ -1,5 +1,5 @@
 {
-  "name": "shared-prisma-ee-es",
+  "name": "@esupadomit/shared-prisma-ee-es",
   "version": "2.0.0",
   "description": "Schéma Prisma partagé",
   "files": [
