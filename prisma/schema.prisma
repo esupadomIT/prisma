@@ -672,6 +672,22 @@ model Conversation {
   user1     User      @relation("ConversationUser1", fields: [userId1], references: [id], onDelete: Cascade)
   user2     User      @relation("ConversationUser2", fields: [userId2], references: [id], onDelete: Cascade)
   messages  Message[]
+
+  // [COMMUN] — Empêche les conversations dupliquées pour un même binôme
+  // d'utilisateurs (bug "conversations en triplet" : sendMessage faisait un
+  // findFirst+create non atomique côté serveur, sans contrainte en base).
+  // Le code applicatif (src/server/server.js, e-supadom.fr ET elite-etude.tn)
+  // doit normaliser l'ordre de la paire (le plus petit id en userId1) avant
+  // tout find/create pour que cette contrainte soit respectée dans les deux
+  // sens (A,B) et (B,A).
+  //
+  // ⚠️ PAS ADDITIF — contrairement au principe du fichier : `db push` sans
+  // --accept-data-loss refusera de créer cet index tant que des doublons
+  // existent, et bloquera donc le démarrage du conteneur. Dédupliquer les
+  // conversations existantes AVANT de publier cette version, sur TOUTES les
+  // bases concernées (e-supadom.fr ET elite-etude.tn, TEST et PROD) — voir
+  // script de nettoyage dans chaque dépôt consommateur.
+  @@unique([userId1, userId2])
 }
 
 model EsupadomPaiementUsers {
