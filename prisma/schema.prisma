@@ -14,10 +14,10 @@
 //   - Tout champ propre à un seul site reste optionnel (ou avec @default),
 //     donc son ajout à l'autre base est une simple colonne inutilisée,
 //     jamais une contrainte NOT NULL qui casserait les INSERT existants.
-//   - Le SEUL changement qui n'est pas 100% "additif" est le renommage
-//     Disponibilite.instructorId → userId, déjà en place côté e-supadom.fr.
-//     Migration + patch de code encore à faire côté elite-etude.tn — voir
-//     SCHEMA-UNIFICATION.md §1 (dépôt cronjob).
+//   - Le SEUL changement qui n'était pas 100% "additif" était le renommage
+//     Disponibilite.instructorId → userId — déployé et validé des deux côtés
+//     (e-supadom.fr et elite-etude.tn : base + code) le 29/08/2026. Voir
+//     SCHEMA-UNIFICATION.md §1 (dépôt cronjob) pour l'historique.
 //
 // Repères dans les commentaires :
 //   [COMMUN]          → utilisé par les deux sites, aucune divergence
@@ -71,9 +71,14 @@ model User {
   // [COMMUN] Anti-double-passage du cron rentrée scolaire (cronjob) : mémorise
   // l'année du dernier passage de niveau automatique pour cet élève, pour ne
   // pas faire sauter 2 niveaux si le cron est relancé la même année.
-  // ⚠️ Migration base pas encore générée/appliquée sur e-supadom.fr ni
-  // elite-etude.tn au moment de l'ajout de ce champ — à faire avant tout
-  // déploiement du cron cron-rentree-scolaire-niveau-eleves.ts.
+  // ⚠️ Colonne déjà présente en base sur e-supadom.fr (vérifié 29/08/2026),
+  // ajoutée hors du flux normal (pas via ce package). Les apps consommatrices
+  // (e-supadom.fr, elite-etude.tn, admin×2) tournent encore sur une version
+  // publiée plus ancienne de ce package et ne déclarent pas ce champ dans leur
+  // client Prisma généré — sans impact aujourd'hui (rien dans leur code n'y
+  // touche), mais à corriger via republish + réinstall avant d'écrire du code
+  // applicatif dessus. Le dépôt cronjob (client Prisma généré séparément,
+  // resynchronisé plus récemment) le voit déjà correctement.
   lastLevelUpYear        Int?
   balance                String?
   forfait                String?        @default("")
@@ -123,10 +128,10 @@ model User {
 
 model Disponibilite {
   id          Int      @id @default(autoincrement())
-  // [DIVERGENCE #1] Champ nommé `instructorId`/`instructor` côté elite-etude.tn
-  // aujourd'hui. Nom canonique retenu ici : `userId`/`user` (déjà en prod
-  // côté e-supadom.fr). Migration + patch de code requis côté elite-etude.tn
-  // avant de pointer ce schéma sur sa base — voir SCHEMA-UNIFICATION.md §1.
+  // [RÉSOLU 29/08/2026] Anciennement `instructorId`/`instructor` côté
+  // elite-etude.tn. Nom canonique retenu : `userId`/`user`. Migration base +
+  // patch de code (src/app/api/disponibilites/) déployés et vérifiés en prod
+  // des deux côtés — voir SCHEMA-UNIFICATION.md §1 pour l'historique.
   userId      Int
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   startDate   DateTime
@@ -229,12 +234,12 @@ model UserMatiere {
 
 model Seance {
   id                Int      @id @default(autoincrement())
-  // [DIVERGENCE #4] @db.Timestamptz(3) : côté e-supadom.fr uniquement pour
-  // l'instant (correction d'un bug de fuseau horaire). Conservé ici tel
-  // quel pour ne rien changer au comportement actuel de e-supadom.fr.
-  // NE PAS appliquer `prisma migrate`/`db push` de ce schéma sur la base
-  // elite-etude.tn tant que la conversion timestamp→timestamptz de ses
-  // données existantes n'a pas été validée — voir SCHEMA-UNIFICATION.md §4.
+  // [RÉSOLU 29/08/2026] @db.Timestamptz(3) — à l'origine correction d'un bug
+  // de fuseau horaire côté e-supadom.fr uniquement. La conversion côté
+  // elite-etude.tn (timestamp → timestamptz, données existantes réinterprétées
+  // en Africa/Tunis) est maintenant déployée et vérifiée en prod : heures de
+  // séances contrôlées cohérentes (UTC+1 constant) après conversion. Voir
+  // SCHEMA-UNIFICATION.md §4 pour l'historique.
   date              DateTime @db.Timestamptz(3)
   horaire           String
   duration          String
