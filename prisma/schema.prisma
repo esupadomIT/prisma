@@ -1,12 +1,9 @@
 // ============================================================================
-// SCHÉMA PRISMA PARTAGÉ — @guetatanouar/prisma-esupadom.fr
+// SCHÉMA PRISMA COMMUN — e-supadom.fr + elite-etude.tn
 // ----------------------------------------------------------------------------
-// Package consommé par e-supadom.fr, elite-etude.tn et le dépôt cronjob —
-// source de vérité unique pour éviter que les trois divergent silencieusement.
-//
-// Construit par fusion additive des schémas e-supadom.fr et elite-etude.tn
-// (voir historique dans le dépôt cronjob : docs/SCHEMA-UNIFICATION.md pour le
-// détail des différences trouvées et la marche à suivre par site).
+// Base de départ : src/prisma/schema.prisma (e-supadom.fr), le plus complet
+// des deux (764 lignes contre 652 pour elite-etude.tn), avec réintégration
+// de tout ce qui n'existe QUE côté elite-etude.tn.
 //
 // Principe appliqué partout : ADDITIF UNIQUEMENT.
 //   - Aucun champ ni modèle utilisé par un site n'est supprimé ou renommé
@@ -14,22 +11,16 @@
 //   - Tout champ propre à un seul site reste optionnel (ou avec @default),
 //     donc son ajout à l'autre base est une simple colonne inutilisée,
 //     jamais une contrainte NOT NULL qui casserait les INSERT existants.
-//   - Le SEUL changement qui n'était pas 100% "additif" était le renommage
-//     Disponibilite.instructorId → userId — déployé et validé des deux côtés
-//     (e-supadom.fr et elite-etude.tn : base + code) le 29/08/2026. Voir
-//     SCHEMA-UNIFICATION.md §1 (dépôt cronjob) pour l'historique.
+//   - Le SEUL changement qui n'est pas 100% "additif" est le renommage
+//     Disponibilite.instructorId → userId, déjà en place côté e-supadom.fr.
+//     Voir SCHEMA-UNIFICATION.md, section 1, pour la marche à suivre.
 //
 // Repères dans les commentaires :
 //   [COMMUN]          → utilisé par les deux sites, aucune divergence
 //   [ESUPADOM]        → n'existe aujourd'hui que côté e-supadom.fr
 //   [ELITE]           → n'existe aujourd'hui que côté elite-etude.tn
 //   [DIVERGENCE #n]   → renvoie à la section correspondante de
-//                       SCHEMA-UNIFICATION.md (dépôt cronjob)
-//
-// ⚠️ Après toute modification ici : bumper la version dans package.json,
-// publier (`npm publish`), puis dans chaque projet consommateur réinstaller
-// la dépendance et lancer `prisma migrate dev` / `db push` pour appliquer
-// réellement les changements en base avant de compter dessus en prod.
+//                       SCHEMA-UNIFICATION.md
 // ============================================================================
 
 generator client {
@@ -68,18 +59,6 @@ model User {
   niveauId               Int?
   status                 StatusUser     @default(Inactive)
   inscriptionFees        Status         @default(Pending)
-  // [COMMUN] Anti-double-passage du cron rentrée scolaire (cronjob) : mémorise
-  // l'année du dernier passage de niveau automatique pour cet élève, pour ne
-  // pas faire sauter 2 niveaux si le cron est relancé la même année.
-  // ⚠️ Colonne déjà présente en base sur e-supadom.fr (vérifié 29/08/2026),
-  // ajoutée hors du flux normal (pas via ce package). Les apps consommatrices
-  // (e-supadom.fr, elite-etude.tn, admin×2) tournent encore sur une version
-  // publiée plus ancienne de ce package et ne déclarent pas ce champ dans leur
-  // client Prisma généré — sans impact aujourd'hui (rien dans leur code n'y
-  // touche), mais à corriger via republish + réinstall avant d'écrire du code
-  // applicatif dessus. Le dépôt cronjob (client Prisma généré séparément,
-  // resynchronisé plus récemment) le voit déjà correctement.
-  lastLevelUpYear        Int?
   balance                String?
   forfait                String?        @default("")
   typeCour               String?        @default("")
@@ -128,10 +107,10 @@ model User {
 
 model Disponibilite {
   id          Int      @id @default(autoincrement())
-  // [RÉSOLU 29/08/2026] Anciennement `instructorId`/`instructor` côté
-  // elite-etude.tn. Nom canonique retenu : `userId`/`user`. Migration base +
-  // patch de code (src/app/api/disponibilites/) déployés et vérifiés en prod
-  // des deux côtés — voir SCHEMA-UNIFICATION.md §1 pour l'historique.
+  // [DIVERGENCE #1] Champ nommé `instructorId`/`instructor` côté elite-etude.tn
+  // aujourd'hui. Nom canonique retenu ici : `userId`/`user` (déjà en prod
+  // côté e-supadom.fr). Migration + patch de code requis côté elite-etude.tn
+  // avant de pointer ce schéma sur sa base — voir SCHEMA-UNIFICATION.md §1.
   userId      Int
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   startDate   DateTime
@@ -234,12 +213,12 @@ model UserMatiere {
 
 model Seance {
   id                Int      @id @default(autoincrement())
-  // [RÉSOLU 29/08/2026] @db.Timestamptz(3) — à l'origine correction d'un bug
-  // de fuseau horaire côté e-supadom.fr uniquement. La conversion côté
-  // elite-etude.tn (timestamp → timestamptz, données existantes réinterprétées
-  // en Africa/Tunis) est maintenant déployée et vérifiée en prod : heures de
-  // séances contrôlées cohérentes (UTC+1 constant) après conversion. Voir
-  // SCHEMA-UNIFICATION.md §4 pour l'historique.
+  // [DIVERGENCE #4] @db.Timestamptz(3) : côté e-supadom.fr uniquement pour
+  // l'instant (correction d'un bug de fuseau horaire). Conservé ici tel
+  // quel pour ne rien changer au comportement actuel de e-supadom.fr.
+  // NE PAS appliquer `prisma migrate`/`db push` de ce schéma sur la base
+  // elite-etude.tn tant que la conversion timestamp→timestamptz de ses
+  // données existantes n'a pas été validée — voir SCHEMA-UNIFICATION.md §4.
   date              DateTime @db.Timestamptz(3)
   horaire           String
   duration          String
@@ -372,6 +351,8 @@ model Page {
   alt           String?  @db.Text @default("")
   testimonials  Json?
   faq           Json?
+  testimonialsTitle String? @db.VarChar(255)
+  faqTitle      String? @db.VarChar(255)
   createdAt     DateTime @default(now())
   status        Status   @default(Pending)
 }
@@ -672,22 +653,6 @@ model Conversation {
   user1     User      @relation("ConversationUser1", fields: [userId1], references: [id], onDelete: Cascade)
   user2     User      @relation("ConversationUser2", fields: [userId2], references: [id], onDelete: Cascade)
   messages  Message[]
-
-  // [COMMUN] — Empêche les conversations dupliquées pour un même binôme
-  // d'utilisateurs (bug "conversations en triplet" : sendMessage faisait un
-  // findFirst+create non atomique côté serveur, sans contrainte en base).
-  // Le code applicatif (src/server/server.js, e-supadom.fr ET elite-etude.tn)
-  // doit normaliser l'ordre de la paire (le plus petit id en userId1) avant
-  // tout find/create pour que cette contrainte soit respectée dans les deux
-  // sens (A,B) et (B,A).
-  //
-  // ⚠️ PAS ADDITIF — contrairement au principe du fichier : `db push` sans
-  // --accept-data-loss refusera de créer cet index tant que des doublons
-  // existent, et bloquera donc le démarrage du conteneur. Dédupliquer les
-  // conversations existantes AVANT de publier cette version, sur TOUTES les
-  // bases concernées (e-supadom.fr ET elite-etude.tn, TEST et PROD) — voir
-  // script de nettoyage dans chaque dépôt consommateur.
-  @@unique([userId1, userId2])
 }
 
 model EsupadomPaiementUsers {
