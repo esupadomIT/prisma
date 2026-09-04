@@ -59,6 +59,7 @@ model User {
   niveauId               Int?
   status                 StatusUser     @default(Inactive)
   inscriptionFees        Status         @default(Pending)
+  lastLevelUpYear        Int?
   balance                String?
   forfait                String?        @default("")
   typeCour               String?        @default("")
