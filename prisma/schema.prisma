@@ -386,6 +386,19 @@ model Forfait {
   heureMax  Int?
   echeance  String
   niveau  String @default("")
+  // [ESUPADOM] Mois (1=janvier ... 12=decembre) pendant lesquels ce forfait est
+  // "le forfait du moment" pour l'inscription en ligne (cochés manuellement par
+  // l'admin dans le BO, page /apps/forfaits). Utilisé à deux endroits côté
+  // e-supadom.fr :
+  //   - à l'inscription (src/app/api/auth/signup/route.js) pour choisir la
+  //     valeur initiale de User.forfait selon le mois en cours ;
+  //   - à l'étape 4 du wizard "Recharger mon compte" (Step3FormuleAbonnement.js)
+  //     comme repli si User.forfait est vide, pour mettre en avant la formule
+  //     recommandée du mois.
+  // Tableau vide par défaut = ce forfait n'est recommandé pour aucun mois tant
+  // que l'admin ne l'a pas configuré (additif, ne casse rien côté elite-etude.tn
+  // qui n'utilise pas ce champ).
+  moisActifs Int[]   @default([])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

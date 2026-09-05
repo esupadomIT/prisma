@@ -51,5 +51,6 @@ Le dossier `prisma/migrations/` reflète l'historique jusqu'à juin 2025. Depuis
 | `Seance.date`/`createdAt`/`updatedAt` en `@db.Timestamptz(3)` | ✅ Résolu côté elite-etude.tn (conversion `Africa/Tunis` validée sur données réelles) |
 | `User.lastLevelUpYear` | Colonne déjà en base sur e-supadom.fr, mais absente des copies de schéma actuellement installées par les 4 apps consommatrices (version npm plus ancienne) — à republier/réinstaller |
 | `TrouverProfRequest` : `relance12hSentAt`, `adminAlert24hSentAt`, `acceptedEmailSentAt` | ❌ Pas encore ajoutés au schéma — bloque `cron-relance-mission-trouver-prof.ts` (dépôt `cronjob`) |
+| `Forfait.moisActifs` (v2.0.5) | `[ESUPADOM]` Mois (1-12) où un forfait est "le forfait du moment", cochés dans le BO (`admin.e-supadom.fr`, page `/apps/forfaits`). Utilisé par `e-supadom.fr` à l'inscription (`api/auth/signup`) et à l'étape 4 du wizard "Recharger mon compte" (`Step3FormuleAbonnement.js`). Additif, `@default([])` — colonne inutilisée côté elite-etude.tn. |
 
 Détail complet dans `docs/SCHEMA-UNIFICATION.md` (dépôt `cronjob`).
