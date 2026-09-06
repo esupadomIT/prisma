@@ -399,6 +399,13 @@ model Forfait {
   // que l'admin ne l'a pas configuré (additif, ne casse rien côté elite-etude.tn
   // qui n'utilise pas ce champ).
   moisActifs Int[]   @default([])
+  // [ESUPADOM] Contenu marketing de la carte affichée dans Step3FormuleAbonnement.js
+  // (nom de formule, description, avantages) — entièrement éditable depuis le BO
+  // (admin.e-supadom.fr → /apps/forfaits) plutôt que codé en dur côté front.
+  // Valeurs par défaut vides = additif, ne casse rien côté elite-etude.tn.
+  duree       String   @default("") // ex: "Suivi 10 mois"
+  description String   @default("") @db.Text
+  avantages   String[] @default([])
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
