@@ -93,6 +93,7 @@ model User {
   facebookId              String?   @unique
   disponibilites          Disponibilite[]
   instructorAvailabilityCronFlags InstructorAvailabilityCronFlag?
+  studentAvailabilityCronFlags    StudentAvailabilityCronFlag?
 
   // [ESUPADOM] Zones scolaires France (A/B/C/SPECIFIQUE) — sans objet pour
   // elite-etude.tn (Tunisie, pas de zonage académique), laissés null.
@@ -108,15 +109,14 @@ model User {
 
 model Disponibilite {
   id          Int      @id @default(autoincrement())
-  // [DIVERGENCE #1] Champ nommé `instructorId`/`instructor` côté elite-etude.tn
-  // aujourd'hui. Nom canonique retenu ici : `userId`/`user` (déjà en prod
-  // côté e-supadom.fr). Migration + patch de code requis côté elite-etude.tn
-  // avant de pointer ce schéma sur sa base — voir SCHEMA-UNIFICATION.md §1.
+  // [DIVERGENCE #1] RÉSOLU — canon `userId`/`user` des deux côtés
+  // (e-supadom.fr déjà en prod ; elite-etude.tn migré colonne + code, v2.0.9).
   userId      Int
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   startDate   DateTime
   endDate     DateTime
   isAvailable Boolean  @default(true)
+  source      String   @default("manual") // "manual" ou "weekly" (gestion dispo étudiant)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -470,6 +470,21 @@ model InstructorAvailabilityCronFlag {
 
   @@index([showPopup])
   @@map("instructor_availability_cron_flags")
+}
+
+// [ELITE] Popup première connexion étudiant — disponibilités hebdo.
+// Additif : table inutilisée côté e-supadom.fr.
+model StudentAvailabilityCronFlag {
+  id                      Int      @id @default(autoincrement())
+  studentId               Int      @unique
+  student                 User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  showPopup               Boolean  @default(false)
+  lastEvaluatedAt         DateTime @default(now())
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  @@index([showPopup])
+  @@map("student_availability_cron_flags")
 }
 
 model Candidature {

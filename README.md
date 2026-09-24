@@ -45,9 +45,11 @@ Le dossier `prisma/migrations/` reflète l'historique jusqu'à juin 2025. Depuis
 
 ## Divergences connues et leur état
 
-| Sujet | État au 29/08/2026 |
+| Sujet | État au 24/09/2026 |
 |---|---|
-| `Disponibilite.instructorId` → `userId` | ✅ Résolu — base + code migrés des deux côtés |
+| `Disponibilite.instructorId` → `userId` | ✅ Résolu — canon `userId` ; elite-etude.tn colonne + code migrés (v2.0.9) |
+| `Disponibilite.source` | ✅ Ajouté en v2.0.9 (absent du client partagé, requis par le popup dispo hebdo elite) |
+| `StudentAvailabilityCronFlag` | ✅ Ajouté en v2.0.9 `[ELITE]` — popup première connexion étudiant |
 | `Seance.date`/`createdAt`/`updatedAt` en `@db.Timestamptz(3)` | ✅ Résolu côté elite-etude.tn (conversion `Africa/Tunis` validée sur données réelles) |
 | `User.lastLevelUpYear` | Colonne déjà en base sur e-supadom.fr, mais absente des copies de schéma actuellement installées par les 4 apps consommatrices (version npm plus ancienne) — à republier/réinstaller |
 | `TrouverProfRequest` : `relance12hSentAt`, `adminAlert24hSentAt`, `acceptedEmailSentAt` | ❌ Pas encore ajoutés au schéma — bloque `cron-relance-mission-trouver-prof.ts` (dépôt `cronjob`) |
