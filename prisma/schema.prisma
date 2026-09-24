@@ -472,7 +472,6 @@ model InstructorAvailabilityCronFlag {
   @@map("instructor_availability_cron_flags")
 }
 
- 
 // e-supadom.fr : table complète en prod (éligibilité, fenêtre, relances).
 // elite-etude.tn : n'utilise que showPopup/lastEvaluatedAt ; les autres
 // colonnes ont un @default ou sont optionnelles → ajout purement additif.
