@@ -472,16 +472,26 @@ model InstructorAvailabilityCronFlag {
   @@map("instructor_availability_cron_flags")
 }
 
-// [ELITE] Popup première connexion étudiant — disponibilités hebdo.
-// Additif : table inutilisée côté e-supadom.fr.
+// [COMMUN] Popup / relances disponibilités étudiant.
+// e-supadom.fr : table complète en prod (éligibilité, fenêtre, relances).
+// elite-etude.tn : n'utilise que showPopup/lastEvaluatedAt ; les autres
+// colonnes ont un @default ou sont optionnelles → ajout purement additif.
 model StudentAvailabilityCronFlag {
-  id                      Int      @id @default(autoincrement())
-  studentId               Int      @unique
-  student                 User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  showPopup               Boolean  @default(false)
-  lastEvaluatedAt         DateTime @default(now())
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
+  id                      Int       @id @default(autoincrement())
+  studentId               Int       @unique
+  student                 User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  isEligible              Boolean   @default(false)   // [ESUPADOM]
+  hasAvailabilityInWindow Boolean   @default(false)   // [ESUPADOM]
+  showPopup               Boolean   @default(false)
+  reminderEnabled         Boolean   @default(true)    // [ESUPADOM]
+  windowStart             DateTime?                   // [ESUPADOM]
+  windowEndExclusive      DateTime?                   // [ESUPADOM]
+  activityStart           DateTime?                   // [ESUPADOM]
+  lastEvaluatedAt         DateTime  @default(now())
+  lastReminderSentAt      DateTime?                   // [ESUPADOM]
+  reminderSentCount       Int       @default(0)       // [ESUPADOM]
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   @@index([showPopup])
   @@map("student_availability_cron_flags")
