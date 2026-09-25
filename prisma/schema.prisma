@@ -229,7 +229,7 @@ model Seance {
   updatedAt         DateTime @updatedAt @db.Timestamptz(3)
   google_meet_link  String   @default("#")
   google_meet_record String  @default("#")
-  minoration_prix_per_hour Float? @default(0)
+  majoration_prix_per_hour Float? @default(0)
   instructorId      Int
   instructor        User     @relation("SeanceInstructor", fields: [instructorId], references: [id], onDelete: Cascade)
   students          User[]   @relation("SeanceStudents")
