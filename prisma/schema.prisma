@@ -698,6 +698,7 @@ model Conversation {
   user1     User      @relation("ConversationUser1", fields: [userId1], references: [id], onDelete: Cascade)
   user2     User      @relation("ConversationUser2", fields: [userId2], references: [id], onDelete: Cascade)
   messages  Message[]
+  @@unique([userId1, userId2])
 }
 
 model EsupadomPaiementUsers {
