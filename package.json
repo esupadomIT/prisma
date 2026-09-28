@@ -7,7 +7,8 @@
     "prisma/migrations/**"
   ],
   "scripts": {
-    "postinstall": "echo 'Package installé. Utilisez le script de copie si nécessaire.'"
+    "postinstall": "echo 'Package installé. Utilisez le script de copie si nécessaire.'",
+    "update-consumers": "node scripts/update-consumers.mjs"
   },
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
