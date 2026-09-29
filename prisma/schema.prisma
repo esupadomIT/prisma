@@ -94,6 +94,7 @@ model User {
   disponibilites          Disponibilite[]
   instructorAvailabilityCronFlags InstructorAvailabilityCronFlag?
   studentAvailabilityCronFlags    StudentAvailabilityCronFlag?
+  studentAvailabilityPreference   StudentAvailabilityPreference?
 
   // [ESUPADOM] Zones scolaires France (A/B/C/SPECIFIQUE) — sans objet pour
   // elite-etude.tn (Tunisie, pas de zonage académique), laissés null.
@@ -109,8 +110,10 @@ model User {
 
 model Disponibilite {
   id          Int      @id @default(autoincrement())
-  // [DIVERGENCE #1] RÉSOLU — canon `userId`/`user` des deux côtés
-  // (e-supadom.fr déjà en prod ; elite-etude.tn migré colonne + code, v2.0.9).
+  // [DIVERGENCE #1] Champ nommé `instructorId`/`instructor` côté elite-etude.tn
+  // aujourd'hui. Nom canonique retenu ici : `userId`/`user` (déjà en prod
+  // côté e-supadom.fr). Migration + patch de code requis côté elite-etude.tn
+  // avant de pointer ce schéma sur sa base — voir SCHEMA-UNIFICATION.md §1.
   userId      Int
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   startDate   DateTime
@@ -379,6 +382,19 @@ model mailing {
   createdAt    DateTime @default(now())
 }
 
+// Messages types du tchat (site e-supadom.fr), gérés depuis l'admin
+// (Messages > Messages types). Variables remplacées côté site au moment
+// de l'insertion : [Prenom_etudiant], [Prenom_prof], [Prenom].
+// audience : "INSTRUCTOR" (proposé aux profs), "STUDENT" (proposé aux
+// élèves/parents) ou "ALL" (proposé à tous).
+model messageType {
+  id           Int      @id @default(autoincrement())
+  title        String?  @db.VarChar(255) @default("Nouveau message")
+  content      String?  @db.Text @default("")
+  audience     String   @db.VarChar(20) @default("INSTRUCTOR")
+  createdAt    DateTime @default(now())
+}
+
 model Forfait {
   id        Int      @id @default(autoincrement())
   value     String   @unique
@@ -477,24 +493,40 @@ model InstructorAvailabilityCronFlag {
 // elite-etude.tn : n'utilise que showPopup/lastEvaluatedAt ; les autres
 // colonnes ont un @default ou sont optionnelles → ajout purement additif.
 model StudentAvailabilityCronFlag {
-  id                      Int       @id @default(autoincrement())
-  studentId               Int       @unique
-  student                 User      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  isEligible              Boolean   @default(false)   // [ESUPADOM]
-  hasAvailabilityInWindow Boolean   @default(false)   // [ESUPADOM]
-  showPopup               Boolean   @default(false)
-  reminderEnabled         Boolean   @default(true)    // [ESUPADOM]
-  windowStart             DateTime?                   // [ESUPADOM]
-  windowEndExclusive      DateTime?                   // [ESUPADOM]
-  activityStart           DateTime?                   // [ESUPADOM]
-  lastEvaluatedAt         DateTime  @default(now())
-  lastReminderSentAt      DateTime?                   // [ESUPADOM]
-  reminderSentCount       Int       @default(0)       // [ESUPADOM]
-  createdAt               DateTime  @default(now())
-  updatedAt               DateTime  @updatedAt
+  id                      Int      @id @default(autoincrement())
+  studentId               Int      @unique
+  student                 User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  isEligible              Boolean  @default(false)
+  hasAvailabilityInWindow Boolean  @default(false)
+  showPopup               Boolean  @default(false)
+  reminderEnabled         Boolean  @default(true)
+  windowStart             DateTime?
+  windowEndExclusive      DateTime?
+  activityStart           DateTime?
+  lastEvaluatedAt         DateTime @default(now())
+  lastReminderSentAt      DateTime?
+  reminderSentCount       Int      @default(0)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
   @@index([showPopup])
   @@map("student_availability_cron_flags")
+}
+
+model StudentAvailabilityPreference {
+  id                Int      @id @default(autoincrement())
+  userId            Int      @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // Préférences hebdomadaires: { "1": [{start:"08:00",end:"12:00"},...], ... }
+  // Clés = jour de la semaine (0=Dim, 1=Lun, ..., 6=Sam)
+  slots             Json     @default("{}")
+  schoolYear        String   @default("")   // ex: "2026-2027"
+  confirmedForMonth String?                 // "YYYY-MM" du dernier mois confirmé
+  lastConfirmedAt   DateTime?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@map("student_availability_preferences")
 }
 
 model Candidature {
