@@ -93,8 +93,6 @@ model User {
   facebookId              String?   @unique
   disponibilites          Disponibilite[]
   instructorAvailabilityCronFlags InstructorAvailabilityCronFlag?
-  studentAvailabilityCronFlags    StudentAvailabilityCronFlag?
-  studentAvailabilityPreference   StudentAvailabilityPreference?
 
   // [ESUPADOM] Zones scolaires France (A/B/C/SPECIFIQUE) — sans objet pour
   // elite-etude.tn (Tunisie, pas de zonage académique), laissés null.
@@ -119,7 +117,6 @@ model Disponibilite {
   startDate   DateTime
   endDate     DateTime
   isAvailable Boolean  @default(true)
-  source      String   @default("manual") // "manual" ou "weekly" (gestion dispo étudiant)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -232,7 +229,6 @@ model Seance {
   updatedAt         DateTime @updatedAt @db.Timestamptz(3)
   google_meet_link  String   @default("#")
   google_meet_record String  @default("#")
-  majoration_prix_per_hour Float? @default(0)
   minoration_prix_per_hour Float? @default(0)
   instructorId      Int
   instructor        User     @relation("SeanceInstructor", fields: [instructorId], references: [id], onDelete: Cascade)
@@ -383,14 +379,14 @@ model mailing {
 }
 
 // Messages types du tchat (site e-supadom.fr), gérés depuis l'admin
+// (contenu HTML : couleurs, gras, liens...).
 // (Messages > Messages types). Variables remplacées côté site au moment
 // de l'insertion : [Prenom_etudiant], [Prenom_prof], [Prenom].
 // audience : "INSTRUCTOR" (proposé aux profs), "STUDENT" (proposé aux
 // élèves/parents) ou "ALL" (proposé à tous).
 model messageType {
   id           Int      @id @default(autoincrement())
-  title        String?  @db.VarChar(255) @default("Nouveau message")
-  content      String?  @db.Text @default("")
+  content      String?  @db.Text @default("") // HTML (éditeur TinyMCE de l'admin)
   audience     String   @db.VarChar(20) @default("INSTRUCTOR")
   createdAt    DateTime @default(now())
 }
@@ -487,46 +483,6 @@ model InstructorAvailabilityCronFlag {
 
   @@index([showPopup])
   @@map("instructor_availability_cron_flags")
-}
-
-// e-supadom.fr : table complète en prod (éligibilité, fenêtre, relances).
-// elite-etude.tn : n'utilise que showPopup/lastEvaluatedAt ; les autres
-// colonnes ont un @default ou sont optionnelles → ajout purement additif.
-model StudentAvailabilityCronFlag {
-  id                      Int      @id @default(autoincrement())
-  studentId               Int      @unique
-  student                 User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  isEligible              Boolean  @default(false)
-  hasAvailabilityInWindow Boolean  @default(false)
-  showPopup               Boolean  @default(false)
-  reminderEnabled         Boolean  @default(true)
-  windowStart             DateTime?
-  windowEndExclusive      DateTime?
-  activityStart           DateTime?
-  lastEvaluatedAt         DateTime @default(now())
-  lastReminderSentAt      DateTime?
-  reminderSentCount       Int      @default(0)
-  createdAt               DateTime @default(now())
-  updatedAt               DateTime @updatedAt
-
-  @@index([showPopup])
-  @@map("student_availability_cron_flags")
-}
-
-model StudentAvailabilityPreference {
-  id                Int      @id @default(autoincrement())
-  userId            Int      @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  // Préférences hebdomadaires: { "1": [{start:"08:00",end:"12:00"},...], ... }
-  // Clés = jour de la semaine (0=Dim, 1=Lun, ..., 6=Sam)
-  slots             Json     @default("{}")
-  schoolYear        String   @default("")   // ex: "2026-2027"
-  confirmedForMonth String?                 // "YYYY-MM" du dernier mois confirmé
-  lastConfirmedAt   DateTime?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  @@map("student_availability_preferences")
 }
 
 model Candidature {
@@ -697,6 +653,7 @@ model Favourite {
 model Message {
   id             Int          @id @default(autoincrement())
   text           String?
+  isHtml         Boolean      @default(false) // true = text contient du HTML nettoyé (message type en couleur)
   createdAt      DateTime     @default(now())
   senderId       Int
   receiverId     Int
@@ -731,7 +688,6 @@ model Conversation {
   user1     User      @relation("ConversationUser1", fields: [userId1], references: [id], onDelete: Cascade)
   user2     User      @relation("ConversationUser2", fields: [userId2], references: [id], onDelete: Cascade)
   messages  Message[]
-  @@unique([userId1, userId2])
 }
 
 model EsupadomPaiementUsers {
