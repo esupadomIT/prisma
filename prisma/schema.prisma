@@ -899,3 +899,16 @@ enum TrouverProfInstructorStatus {
   ACCEPTED
   DECLINED
 }
+
+// Table technique de watermark utilisée par le cron de synchro disponibilités (cron-sync-dispo-prof)
+model SyncDispoWatermark {
+  profKey           String
+  side              String
+  fingerprint       String
+  seanceFingerprint String?
+  updatedAt         DateTime @default(now()) @updatedAt
+
+  @@id([profKey, side])
+  @@map("_SyncDispoWatermark")
+}
+
