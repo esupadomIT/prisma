@@ -259,11 +259,20 @@ model Seance {
   instructorRelance Int?     @default(0)
   studentRelance    Int?     @default(0)
 
+  // [COMMUN] « Séance effectuée » (OUI/NON) — calculé par le cron
+  // cronjob/src/cronJob/cron-detect-seances-effectuees.ts à partir de la présence réelle dans
+  // Google Meet (API Meet : conferenceRecords / participants / participantSessions).
+  // null = pas encore vérifié (ou vérification impossible), true = OUI, false = NON.
+  seance_effectuee            Boolean?
+  seance_effectuee_checked_at DateTime? @db.Timestamptz(3)
+  seance_effectuee_details    String?   @db.Text // JSON : participants, minutes ensemble, raison
+
   @@index([instructorId])
   @@index([date])
   @@index([status])
   @@index([is_deleted])
   @@index([deleted_at])
+  @@index([seance_effectuee])
 }
 
 enum SeanceStatus {
