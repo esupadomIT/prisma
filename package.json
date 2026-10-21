@@ -1,6 +1,6 @@
 {
   "name": "@esupadomit/shared-prisma-ee-es",
-  "version": "2.0.19",
+  "version": "2.0.20",
   "description": "Schéma Prisma partagé",
   "files": [
     "prisma/schema.prisma",
