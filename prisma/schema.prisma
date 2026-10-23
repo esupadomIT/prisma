@@ -106,6 +106,9 @@ model User {
   trouverProfRequests           TrouverProfRequest[]           @relation("TrouverProfRequestStudent")
   trouverProfAcceptedRequests   TrouverProfRequest[]           @relation("TrouverProfRequestAccepted")
   trouverProfInstructorRequests TrouverProfRequestInstructor[]
+
+  // [COMMUN] Application mobile : jetons de notification push (Expo)
+  deviceTokens                  DeviceToken[]
 }
 
 model Disponibilite {
@@ -920,3 +923,20 @@ model SyncDispoWatermark {
   @@map("_SyncDispoWatermark")
 }
 
+// [COMMUN] Application mobile (admin.mobile.e-supadom.fr / mobile.e-supadom.fr) :
+// jetons Expo Push des téléphones connectés. Un jeton appartient à un seul
+// utilisateur (réattribué s'il se reconnecte avec un autre compte sur le même
+// téléphone) ; supprimé à la déconnexion ou quand Expo le déclare invalide
+// (DeviceNotRegistered). Nouvelle table : ajout 100 % additif.
+model DeviceToken {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique // ExponentPushToken[...]
+  platform   String           // ios | android
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
+}
