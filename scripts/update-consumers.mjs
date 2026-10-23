@@ -19,10 +19,12 @@ const REGISTRY = "https://npm.pkg.github.com";
 const REPOS = [
   "esupadomIT/cronjob",
   "esupadomIT/elite-etude.tn",
-  "esupadomIT/e-supadom.fr",
   "esupadomIT/admin.elite-etude.tn",
+  "esupadomIT/e-supadom.fr",
   "esupadomIT/admin.e-supadom.fr",
-   "esupadomIT/prisma",
+  "esupadomIT/mobile.e-supadom.fr",
+  "esupadomIT/admin.mobile.e-supadom.fr",
+  "esupadomIT/prisma",
 ];
 
 const gh = (apiArgs, input) =>
