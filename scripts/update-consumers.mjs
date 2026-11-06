@@ -22,8 +22,8 @@ const REPOS = [
   "esupadomIT/admin.elite-etude.tn",
   "esupadomIT/e-supadom.fr",
   "esupadomIT/admin.e-supadom.fr",
-  "esupadomIT/mobile.e-supadom.fr",
   "esupadomIT/admin.mobile.e-supadom.fr",
+  "esupadomIT/admin.mobile.elite-etude.tn",
   "esupadomIT/prisma",
 ];
 
