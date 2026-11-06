@@ -294,6 +294,7 @@ model Devis {
   classId       Int
   niveauId      Int?
   message       String?
+  besoin        String?      // [COMMUN] « Votre besoin (Optionnel) » saisi par le client (formulaire de demande de tarifs)
   createdAt     DateTime     @default(now())
   updatedAt     DateTime     @updatedAt
   classe        Classe       @relation(fields: [classId], references: [id], onDelete: Cascade)
