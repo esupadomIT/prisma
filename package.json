@@ -1,10 +1,6 @@
 {
   "name": "@esupadomit/shared-prisma-ee-es",
-<<<<<<< HEAD
-  "version": "2.0.21",
-=======
-  "version": "2.0.22",
->>>>>>> feat/devis-besoin
+  "version": "2.0.23",
   "description": "Schéma Prisma partagé",
   "files": [
     "prisma/schema.prisma",
