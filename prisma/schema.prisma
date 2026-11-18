@@ -81,6 +81,8 @@ model User {
   niveau                 Niveau?        @relation(fields: [niveauId], references: [id])
   userClasses            UserClasse[]
   matieres               UserMatiere[]
+  matiereSoldes          UserMatiereSolde[] // [COMMUN] T168 — solde d'heures par matière
+  matiereSoldeAlerteAt   DateTime?      // [COMMUN] T168 — dernier mail admin « soldes par matière non renseignés » (1 / jour max)
   classe                 Classe[]       @relation("ClasseToUser")
   seances                Seance[]       @relation("SeanceStudents")
   totalHours             Float?         @default(0)
@@ -202,6 +204,7 @@ model Matiere {
   classeId Int
   classe   Classe        @relation(fields: [classeId], references: [id], onDelete: Cascade)
   users    UserMatiere[]
+  soldes   UserMatiereSolde[]
   devis    Devis[]       @relation("DevisMatieres")
 }
 
@@ -213,6 +216,33 @@ model UserMatiere {
   user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, matiereId])
+}
+
+// [COMMUN] T168 — Solde d'heures par matière.
+// Un forfait peut couvrir plusieurs matières (ex. maths 4 h + français 4 h) : chaque
+// ligne garde les heures restantes d'UNE matière, en plus du solde global
+// (User.balance en €, toujours débité comme avant). Rempli automatiquement après
+// un paiement CB (source "CB") ou saisi par l'admin dans le BO (source "ADMIN").
+// Rapprochement avec une séance par le NOM de matière (Seance.matiere est un
+// texte), normalisé côté code (casse, accents, espaces) : matiereNom est la clé,
+// matiereId est informatif (une matière est liée à une classe et change d'id
+// quand l'élève change de classe). Aucune ligne pour un élève = ancien
+// comportement (contrôle du solde global seulement).
+model UserMatiereSolde {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  matiereId      Int?
+  matiere        Matiere? @relation(fields: [matiereId], references: [id], onDelete: SetNull)
+  matiereNom     String
+  heures         Float    @default(0) // heures restantes (peut être corrigé par l'admin)
+  heuresAchetees Float    @default(0) // cumul des heures créditées (CB + admin), pour l'affichage
+  source         String   @default("ADMIN") @db.VarChar(20) // "CB" | "ADMIN" — origine du dernier crédit
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([userId, matiereNom])
+  @@index([userId])
 }
 
 model Seance {
@@ -759,6 +789,7 @@ model EsupadomPaiementUsers {
   status    Status   @default(Pending)
   recapTransaction String? @default("")
   fraisDossier String? @default("")
+  matieresPanier Json?  // [COMMUN] T168 — panier de matières du wizard ([{ n, i, p }]) pour répartir les heures après un paiement différé (GoCardless)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
