@@ -111,6 +111,15 @@ model User {
 
   // [COMMUN] Application mobile : jetons de notification push (Expo)
   deviceTokens                  DeviceToken[]
+
+  // [COMMUN] Rôle Parent / Tuteur — voir ParentStudentLink.
+  // managedByParent = true : élève (souvent mineur) dont le profil a été créé
+  // par un parent depuis l'app, sans identifiants propres au départ.
+  // Les anciens champs phoneParent / emailParent restent en place (contact
+  // parent saisi sur la fiche élève) et ne sont pas remplacés.
+  managedByParent               Boolean             @default(false)
+  childrenLinks                 ParentStudentLink[] @relation("ParentLinkParent")  // côté parent : ses enfants
+  parentLinks                   ParentStudentLink[] @relation("ParentLinkStudent") // côté élève : ses parents / tuteurs
 }
 
 model Disponibilite {
@@ -819,6 +828,7 @@ enum Role {
   ADMIN
   STUDENT
   CM
+  PARENT // [COMMUN] Parent / Tuteur : compte propre rattaché à 1..n élèves via ParentStudentLink
 }
 
 enum Type {
@@ -971,4 +981,60 @@ model DeviceToken {
   lastSeenAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// [COMMUN] Rôle Parent / Tuteur (app mobile, puis sites) : lien n-n entre un
+// compte parent (User.role = PARENT) et un compte élève (User.role = STUDENT).
+// Un parent suit 1..n enfants ; un élève peut avoir plusieurs parents/tuteurs.
+// Deux façons de créer le lien :
+//   - le parent crée le profil de l'enfant  → lien ACTIVE d'office,
+//     élève avec managedByParent = true ;
+//   - le parent invite un élève déjà inscrit (e-mail ou code) → lien PENDING
+//     jusqu'à acceptation par l'élève (acceptedAt), ou REJECTED.
+// Droits portés par le lien (et non par le compte) : isPayer (payer, recevoir
+// les factures), canBook (réserver / annuler pour l'enfant).
+// Retrait d'un lien = status REVOKED + revokedAt (pas de suppression, pour
+// garder l'historique des paiements faits pour l'enfant).
+// Nouvelle table + nouveaux enums : ajout 100 % additif.
+model ParentStudentLink {
+  id              Int              @id @default(autoincrement())
+  parentId        Int
+  parent          User             @relation("ParentLinkParent", fields: [parentId], references: [id], onDelete: Cascade)
+  studentId       Int
+  student         User             @relation("ParentLinkStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  relation        ParentRelation   @default(AUTRE)
+  status          ParentLinkStatus @default(PENDING)
+  initiatedBy     ParentLinkOrigin @default(PARENT)
+  isPayer         Boolean          @default(true)
+  canBook         Boolean          @default(true)
+  inviteCode      String?          @unique @db.VarChar(64) // code / jeton d'invitation (lien PENDING), null une fois traité
+  inviteExpiresAt DateTime?
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([parentId, studentId])
+  @@index([studentId])
+  @@index([status])
+}
+
+enum ParentRelation {
+  MERE
+  PERE
+  TUTEUR_LEGAL
+  AUTRE
+}
+
+enum ParentLinkStatus {
+  PENDING  // invitation envoyée, en attente de l'élève
+  ACTIVE   // lien actif
+  REJECTED // invitation refusée par l'élève
+  REVOKED  // lien retiré (par le parent, l'élève ou l'admin)
+}
+
+enum ParentLinkOrigin {
+  PARENT   // créé ou invité par le parent
+  STUDENT  // demandé par l'élève
+  ADMIN    // créé depuis le back-office
 }
