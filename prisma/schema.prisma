@@ -182,15 +182,18 @@ model SchoolHoliday {
 
 model Niveau {
   id      Int      @id @default(autoincrement())
-  nom     String   @unique
+  nom     String
+  pays    String? // [COMMUN] Catalogue pédagogique associé au pays du téléphone.
   classes Classe[]
   users   User[]
   devis   Devis[]
+  @@unique([nom, pays])
 }
 
 model Classe {
   id          Int          @id @default(autoincrement())
-  nom         String       @unique
+  nom         String
+  pays        String?      // [COMMUN] Pays renseigné par plateforme pour les données existantes.
   niveauId    Int
   niveau      Niveau       @relation(fields: [niveauId], references: [id], onDelete: Cascade)
   devis       Devis[]
@@ -198,6 +201,7 @@ model Classe {
   userClasses UserClasse[]
   users       User[]       @relation("ClasseToUser")
   stages      Stage[]
+  @@unique([nom, pays])
 }
 
 model UserClasse {
@@ -213,6 +217,7 @@ model UserClasse {
 model Matiere {
   id       Int           @id @default(autoincrement())
   nom      String
+  pays     String? // [COMMUN] Catalogue pédagogique associé au pays du téléphone.
   classeId Int
   classe   Classe        @relation(fields: [classeId], references: [id], onDelete: Cascade)
   users    UserMatiere[]
